@@ -35,7 +35,8 @@ print("📉 Loading Quantized CLIP Model Object...")
 torch.backends.quantized.engine = 'qnnpack'
 # Load the ENTIRE pickled object (structure + weights)
 # This avoids initializing the 600MB float32 model first
-clip_model = torch.load(quantized_weights_path, map_location=device)
+# Note: weights_only=False is required because we are loading a full model object (code), not just weights.
+clip_model = torch.load(quantized_weights_path, map_location=device, weights_only=False)
 
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
