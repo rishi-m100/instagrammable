@@ -114,5 +114,5 @@ def analyze():
     return jsonify(results)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5001))
+    port = int(os.environ.get("PORT", 5002))
     app.run(port=port, debug=True)

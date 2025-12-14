@@ -38,7 +38,7 @@ function App() {
     });
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5002';
       const response = await axios.post(`${apiUrl}/analyze`, formData, {
         headers: { 'Content-Type': 'multipart/form-type' }
       });
