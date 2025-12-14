@@ -65,6 +65,35 @@ function App() {
 
   const activeData = results.length > 0 ? results : images;
 
+  /* Drag & Drop Handlers */
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      const newImages = files.map(file => ({
+        file,
+        preview: URL.createObjectURL(file),
+        name: file.name
+      }));
+      setImages(prev => [...prev, ...newImages]);
+      setResults([]);
+    }
+  };
+
   return (
     <>
       <div className="app-bg-wrapper">
@@ -104,13 +133,22 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.6 }}
         >
-          <label className="drop-zone">
+          <label 
+            className={`drop-zone ${isDragging ? 'dragging' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <div className="drop-zone-content">
               <div className="upload-icon-wrapper">
-                <Upload size={32} color="#8b5cf6" />
+                <Upload size={32} color={isDragging ? "#d946ef" : "#8b5cf6"} />
               </div>
-              <span className="drop-text-main">Upload Photos</span>
-              <span className="drop-text-sub">Drag & drop or click to browse</span>
+              <span className="drop-text-main">
+                {isDragging ? "Drop to Upload" : "Upload Photos"}
+              </span>
+              <span className="drop-text-sub">
+                {isDragging ? "Release your files here" : "Drag & drop or click to browse"}
+              </span>
             </div>
             <input type="file" multiple accept="image/*" onChange={handleFileChange} hidden />
             
@@ -118,8 +156,11 @@ function App() {
             <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0.05), transparent 70%)',
-                zIndex: 1
+                background: isDragging 
+                    ? 'radial-gradient(circle at center, rgba(217, 70, 239, 0.15), transparent 70%)'
+                    : 'radial-gradient(circle at center, rgba(139, 92, 246, 0.05), transparent 70%)',
+                zIndex: 1,
+                transition: 'background 0.3s ease'
             }} />
           </label>
             

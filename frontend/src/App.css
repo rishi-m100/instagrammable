@@ -126,6 +126,14 @@ body {
   transform: translateY(-4px);
 }
 
+.drop-zone.dragging {
+  border-color: var(--secondary);
+  box-shadow: 0 0 50px -5px var(--secondary-glow);
+  transform: scale(1.02);
+  background: rgba(217, 70, 239, 0.05);
+  /* Tint with secondary color */
+}
+
 .drop-zone-content {
   display: flex;
   flex-direction: column;
