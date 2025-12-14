@@ -14,8 +14,33 @@ CORS(app)  # Allow React to communicate with Flask
 print("⏳ Loading AI Models... this may take a minute.")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Load CLIP
-clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
+# Load CLIP (Quantized + Split)
+# Reassemble split file if needed
+quantized_weights_path = "clip_quantized.pth"
+if not os.path.exists(quantized_weights_path):
+    print("🧩 Reassembling split model files...")
+    with open(quantized_weights_path, 'wb') as output_file:
+        chunk_num = 0
+        while True:
+            chunk_name = f"{quantized_weights_path}.part{chunk_num}"
+            if not os.path.exists(chunk_name):
+                break
+            with open(chunk_name, 'rb') as chunk_file:
+                output_file.write(chunk_file.read())
+            chunk_num += 1
+    print("✅ Model reassembled.")
+
+# Initialize empty model structure
+print("📉 Loading Quantized CLIP Model...")
+clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+torch.backends.quantized.engine = 'qnnpack'
+clip_model = torch.quantization.quantize_dynamic(
+    clip_model, {torch.nn.Linear}, dtype=torch.qint8
+)
+state_dict = torch.load(quantized_weights_path, map_location=device)
+clip_model.load_state_dict(state_dict)
+clip_model = clip_model.to(device)
+
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 # Load Your Trained Ensemble Models
