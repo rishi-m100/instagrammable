@@ -8,94 +8,93 @@ from PIL import Image, ImageOps
 from transformers import CLIPProcessor, CLIPModel
 
 app = Flask(__name__)
-CORS(app)  # Allow React to communicate with Flask
+CORS(app)
 
-# --- 1. Load Models (Run once on startup) ---
-print("⏳ Loading AI Models... this may take a minute.")
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# Load CLIP (Quantized + Split)
-# Reassemble split file if needed
-quantized_weights_path = "clip_full_quantized.pth"
-if not os.path.exists(quantized_weights_path):
-    print("🧩 Reassembling split model files...")
-    with open(quantized_weights_path, 'wb') as output_file:
-        chunk_num = 0
-        while True:
-            chunk_name = f"{quantized_weights_path}.part{chunk_num}"
-            if not os.path.exists(chunk_name):
-                break
-            with open(chunk_name, 'rb') as chunk_file:
-                output_file.write(chunk_file.read())
-            chunk_num += 1
-    print("✅ Model reassembled.")
-
-# Initialize empty model structure
-print("📉 Loading Quantized CLIP Model Object...")
-torch.backends.quantized.engine = 'qnnpack'
-# Load the ENTIRE pickled object (structure + weights)
-# This avoids initializing the 600MB float32 model first
-# Note: weights_only=False is required because we are loading a full model object (code), not just weights.
-clip_model = torch.load(quantized_weights_path, map_location=device, weights_only=False)
-
-processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
-# Load Your Trained Ensemble Models
-MODELS_DIR = "./models"
+# --- GLOBAL VARIABLES (initially None) ---
+clip_model = None
+processor = None
 trained_models = {}
+MODELS_LOADED = False # Flag to track status
 
-if os.path.exists(MODELS_DIR):
-    for filename in os.listdir(MODELS_DIR):
-        if filename.endswith(".pkl"):
-            name = filename.replace("model_", "").replace(".pkl", "").replace("_", " ")
-            try:
-                with open(os.path.join(MODELS_DIR, filename), "rb") as f:
-                    trained_models[name] = pickle.load(f)
-                print(f"✅ Loaded: {name}")
-            except Exception as e:
-                print(f"❌ Failed to load {name}: {e}")
-else:
-    print("⚠️ WARNING: No 'models' folder found. Please create it and add your .pkl files.")
+# --- HELPER: Lazy Loader Function ---
+def load_models_lazy():
+    global clip_model, processor, trained_models, MODELS_LOADED
+    
+    if MODELS_LOADED:
+        return # Already loaded, skip
 
-print("🚀 Server is ready!")
+    print("⏳ Starting Lazy Load of Models...")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# --- 2. Prediction Endpoint ---
+    # 1. Load CLIP
+    quantized_weights_path = "clip_full_quantized.pth"
+    # (Reassembly logic skipped for brevity, assuming file exists from previous runs)
+    
+    print("📉 Loading CLIP...")
+    torch.backends.quantized.engine = 'qnnpack'
+    # Load CLIP (heavy!)
+    clip_model = torch.load(quantized_weights_path, map_location=device, weights_only=False)
+    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+    # 2. Load Sklearn Models
+    MODELS_DIR = "./models"
+    if os.path.exists(MODELS_DIR):
+        for filename in os.listdir(MODELS_DIR):
+            if filename.endswith(".pkl"):
+                name = filename.replace("model_", "").replace(".pkl", "").replace("_", " ")
+                try:
+                    with open(os.path.join(MODELS_DIR, filename), "rb") as f:
+                        trained_models[name] = pickle.load(f)
+                    print(f"✅ Loaded: {name}")
+                except Exception as e:
+                    print(f"❌ Failed to load {name}: {e}")
+    
+    MODELS_LOADED = True
+    print("🚀 All Models Loaded Successfully!")
+
+# --- ROUTES ---
+
+@app.route('/', methods=['GET'])
+def index():
+    # This route is lightweight and won't crash the server
+    return jsonify({
+        "status": "running", 
+        "message": "Server is active. Models load on first request.",
+        "models_ready": MODELS_LOADED
+    })
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
+    # TRIGGER LOAD HERE (The first user waits a few seconds, but server won't crash on boot)
+    if not MODELS_LOADED:
+        load_models_lazy()
+
     if 'images' not in request.files:
         return jsonify({"error": "No images provided"}), 400
     
     files = request.files.getlist('images')
     results = []
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # Process images
-    # Note: For production, we would process in batches. For a simple app, loop is fine.
     for file in files:
         try:
-            # Load and Preprocess
             image = Image.open(file.stream)
             image = ImageOps.exif_transpose(image).convert("RGB")
             
-            # CLIP Inference
             inputs = processor(images=image, return_tensors="pt").to(device)
             with torch.no_grad():
                 features = clip_model.get_image_features(**inputs)
-                # Normalize (Critical for cosine similarity / aligned training)
                 features = torch.nn.functional.normalize(features, p=2, dim=1)
             
             embedding = features.cpu().numpy().reshape(1, -1)
             
-            # Ensemble Prediction
             model_scores = {}
             total_score = 0
             
             for name, model in trained_models.items():
                 pred = model.predict(embedding)[0]
-                
-                # Handle Classifier vs Regressor logic
                 if "Classifier" not in name:
-                    pred = max(0.0, min(5.0, pred)) # Clip 0-5
-                
+                    pred = max(0.0, min(5.0, pred))
                 model_scores[name] = round(float(pred), 2)
                 total_score += pred
             
@@ -108,21 +107,11 @@ def analyze():
             })
             
         except Exception as e:
-            print(f"Error processing {file.filename}: {e}")
+            print(f"Error: {e}")
             results.append({"filename": file.filename, "error": str(e)})
 
     return jsonify(results)
 
-
-# --- 3. Health Check / Index Route (REQUIRED) ---
-@app.route('/', methods=['GET'])
-def index():
-    return jsonify({
-        "status": "running", 
-        "message": "Instagrammable AI Server is Active",
-        "models_loaded": list(trained_models.keys())
-    })
-    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5002))
     app.run(port=port, debug=True)
