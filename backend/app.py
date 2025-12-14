@@ -113,6 +113,16 @@ def analyze():
 
     return jsonify(results)
 
+
+# --- 3. Health Check / Index Route (REQUIRED) ---
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        "status": "running", 
+        "message": "Instagrammable AI Server is Active",
+        "models_loaded": list(trained_models.keys())
+    })
+    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5002))
     app.run(port=port, debug=True)
