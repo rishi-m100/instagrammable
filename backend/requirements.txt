@@ -1,6 +1,7 @@
 flask
 flask-cors
 numpy==1.26.4
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
 transformers
 pillow
