@@ -26,15 +26,35 @@ def load_models_lazy():
     print("⏳ Starting Lazy Load of Models...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # 1. Load CLIP
+    # 1. Reassemble CLIP Model (Critical Step)
     quantized_weights_path = "clip_full_quantized.pth"
-    # (Reassembly logic skipped for brevity, assuming file exists from previous runs)
+    
+    # Check if the full file is missing. If so, build it from parts.
+    if not os.path.exists(quantized_weights_path):
+        print("🧩 Reassembling split model files...")
+        with open(quantized_weights_path, 'wb') as output_file:
+            chunk_num = 0
+            while True:
+                chunk_name = f"{quantized_weights_path}.part{chunk_num}"
+                if not os.path.exists(chunk_name):
+                    break
+                print(f"   - Writing chunk {chunk_num}...")
+                with open(chunk_name, 'rb') as chunk_file:
+                    output_file.write(chunk_file.read())
+                chunk_num += 1
+        print("✅ Model reassembled.")
     
     print("📉 Loading CLIP...")
     torch.backends.quantized.engine = 'qnnpack'
-    # Load CLIP (heavy!)
-    clip_model = torch.load(quantized_weights_path, map_location=device, weights_only=False)
-    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    
+    # Now that the file exists, we can load it
+    try:
+        clip_model = torch.load(quantized_weights_path, map_location=device, weights_only=False)
+        processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    except FileNotFoundError:
+        print("❌ CRITICAL ERROR: Could not find clip_full_quantized.pth or its parts.")
+        print("   - Please ensure 'clip_full_quantized.pth.part0' etc. are in your repo.")
+        return
 
     # 2. Load Sklearn Models
     MODELS_DIR = "./models"
