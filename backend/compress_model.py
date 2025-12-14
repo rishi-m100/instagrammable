@@ -16,10 +16,10 @@ def compress_and_split():
         dtype=torch.qint8
     )
     
-    # Save optimized state dict
-    output_path = "clip_quantized.pth"
+    # Save optimized full model object
+    output_path = "clip_full_quantized.pth"
     print(f"💾 Saving to {output_path}...")
-    torch.save(quantized_model.state_dict(), output_path)
+    torch.save(quantized_model, output_path)
     
     size_mb = os.path.getsize(output_path) / (1024 * 1024)
     print(f"✅ quantizing complete! New size: {size_mb:.2f} MB")

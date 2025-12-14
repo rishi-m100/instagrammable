@@ -1,0 +1,9 @@
+__pycache__/
+*.pkl
+models/
+venv/
+.env
+.DS_Store
+node_modules/
+backend/clip_quantized.pth
+backend/clip_full_quantized.pth

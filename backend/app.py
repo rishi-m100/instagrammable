@@ -16,7 +16,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Load CLIP (Quantized + Split)
 # Reassemble split file if needed
-quantized_weights_path = "clip_quantized.pth"
+quantized_weights_path = "clip_full_quantized.pth"
 if not os.path.exists(quantized_weights_path):
     print("🧩 Reassembling split model files...")
     with open(quantized_weights_path, 'wb') as output_file:
@@ -31,15 +31,11 @@ if not os.path.exists(quantized_weights_path):
     print("✅ Model reassembled.")
 
 # Initialize empty model structure
-print("📉 Loading Quantized CLIP Model...")
-clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+print("📉 Loading Quantized CLIP Model Object...")
 torch.backends.quantized.engine = 'qnnpack'
-clip_model = torch.quantization.quantize_dynamic(
-    clip_model, {torch.nn.Linear}, dtype=torch.qint8
-)
-state_dict = torch.load(quantized_weights_path, map_location=device)
-clip_model.load_state_dict(state_dict)
-clip_model = clip_model.to(device)
+# Load the ENTIRE pickled object (structure + weights)
+# This avoids initializing the 600MB float32 model first
+clip_model = torch.load(quantized_weights_path, map_location=device)
 
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
