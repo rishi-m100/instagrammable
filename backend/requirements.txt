@@ -1,0 +1,8 @@
+flask
+flask-cors
+numpy==1.26.4
+torch
+transformers==4.35.2
+pillow
+gunicorn
+scikit-learn
