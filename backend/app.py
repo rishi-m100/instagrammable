@@ -8,6 +8,10 @@ from PIL import Image, ImageOps
 from transformers import CLIPProcessor, CLIPModel
 import google.generativeai as genai
 import torch.nn.functional as F
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Allow React to communicate with Flask
@@ -21,7 +25,8 @@ clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 # --- EXPLAINABILITY SETUP ---
-genai.configure(api_key="AIzaSyA5n3Ha038s1LJ2FYmlmhE3h59WAgZgnUs")
+#genai.configure(api_key=GENAI_API_KEY)
+genai.configure(api_key=os.environ.get("GENAI_API_KEY"))
 
 concept_list = [
     # --- POSITIVE: COMPOSITION & TECH ---
@@ -78,9 +83,13 @@ except Exception as e:
 
 
 # Load Your Trained Ensemble Models
-MODELS_DIR = "./models"
+# Prefer tuned models directory if present, otherwise fall back to the original
+PREFERRED_MODELS_DIR = "./models-tuned"
+FALLBACK_MODELS_DIR = "./models"
+MODELS_DIR = PREFERRED_MODELS_DIR if os.path.exists(PREFERRED_MODELS_DIR) else FALLBACK_MODELS_DIR
 trained_models = {}
 
+print(f"Looking for trained models in: {MODELS_DIR}")
 if os.path.exists(MODELS_DIR):
     for filename in os.listdir(MODELS_DIR):
         if filename.endswith(".pkl"):
@@ -92,7 +101,7 @@ if os.path.exists(MODELS_DIR):
             except Exception as e:
                 print(f"❌ Failed to load {name}: {e}")
 else:
-    print("⚠️ WARNING: No 'models' folder found. Please create it and add your .pkl files.")
+    print(f"⚠️ WARNING: No models folder found at {MODELS_DIR}. Create '{PREFERRED_MODELS_DIR}' or '{FALLBACK_MODELS_DIR}' and add your .pkl files.")
 
 
 def get_explanation_data(image_features, score):
