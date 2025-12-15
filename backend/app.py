@@ -184,11 +184,15 @@ def analyze():
             total_score = 0
             
             for name, model in trained_models.items():
-                pred = model.predict(embedding)[0]
-                
-                # Handle Classifier vs Regressor logic
-                if "Classifier" not in name:
-                    pred = max(0.0, min(5.0, pred)) # Clip 0-5
+                if "Classifier" in name:
+                    # 1. Use predict_proba for smooth scoring on the classifier
+                    probs = model.predict_proba(embedding)[0]
+                    classes = model.classes_
+                    # Calculate weighted average: (prob_of_1 * 1) + (prob_of_2 * 2) ...
+                    pred = sum(p * c for p, c in zip(probs, classes))
+                else:
+                    pred = model.predict(embedding)[0]
+                pred = max(0.0, min(5.0, pred)) # Clip 0-5
                 
                 model_scores[name] = round(float(pred), 2)
                 total_score += pred
