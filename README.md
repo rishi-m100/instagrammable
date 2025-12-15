@@ -4,7 +4,7 @@ Our project, titled Instagrammable, answers the question of: Is your photo “In
 
 
 **note**: 
-  Models-tuned includes the folder with the updated models.
+  Ignore Models dir in backend folder. Models-tuned in the root dir inclues final model. 
   
 Video Link: https://youtu.be/Uv7rbF1kiSQ
 
